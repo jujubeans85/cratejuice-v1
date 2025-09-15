@@ -1,35 +1,23 @@
-name: Deploy to Netlify
+name: Netlify Deploy (Bare Bones)
 
 on:
   push:
-    branches:
-      - main   # triggers when you push to main branch
-  workflow_dispatch: # lets you trigger manually in GitHub UI
+    branches: [ "main" ]
+  workflow_dispatch: {}
 
 jobs:
-  build-deploy:
+  deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build project
-        run: npm run build
+      - name: Install Netlify CLI
+        run: npm i -g netlify-cli
 
       - name: Deploy to Netlify
-        uses: nwtgck/actions-netlify@v2.0
-        with:
-          publish-dir: ./dist   # 👈 change if your build output folder is different
-          production-deploy: true
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          echo "Publishing from repo root"
+          netlify deploy --dir="." --prod --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN" --message "Bare bones deploy $(date -u +%FT%TZ)"
