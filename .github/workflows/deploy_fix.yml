@@ -1,0 +1,27 @@
+name: Netlify Deploy
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Unpack site
+        run: |
+          rm -rf dist
+          unzip -qq CrateJuice_Vintage_Postcards.zip -d dist
+
+      - name: Deploy to Netlify
+        uses: nwtgck/actions-netlify@v2.0.1
+        with:
+          publish-dir: dist/vintage_postcards
+          production-deploy: true
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
