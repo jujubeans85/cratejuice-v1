@@ -31,7 +31,7 @@ jobs:
             -d '{"ref":"'"$REF"'", "environment":"production", "required_contexts": [], "transient_environment": false }')
           echo "$RESPONSE" > deployment_response.json
           DEPLOYMENT_ID=$(python - <<'PY'
-import json,sys
+import json
 try:
   j=json.load(open('deployment_response.json'))
   print(j.get('id') or '')
@@ -58,10 +58,38 @@ PY
             https://api.github.com/repos/${{ github.repository }}/deployments/$DEPLOYMENT_ID/statuses \
             -d '{"state":"in_progress"}' > /dev/null
 
-      - name: (Optional) Perform deployment steps
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
         run: |
-          echo "Insert real deployment commands here (scp, kubectl, s3 sync, etc.)."
-          # If deployment fails, set status to failure and exit non-zero to mark job failed.
+          npm ci
+
+      - name: Run tests
+        run: |
+          npm test
+
+      - name: Build
+        run: |
+          npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Sync build to S3
+        run: |
+          aws s3 sync build/ s3://${{ secrets.S3_BUCKET }} --delete
+
+      - name: Invalidate CloudFront (optional)
+        if: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID != '' }}
+        run: |
+          aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
 
       - name: Set deployment status: success
         if: ${{ success() }}
