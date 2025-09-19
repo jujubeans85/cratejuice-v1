@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CrateJuice Player</title>
+</head>
+<body>
+  <h1>CrateJuice Player</h1>
+  <audio id="player" controls autoplay>
+    Your browser does not support the audio element.
+  </audio>
+
+  <script>
+    // Parse ?track=XYZ from the URL
+    const params = new URLSearchParams(window.location.search);
+    const track = params.get('track');
+    const audio = document.getElementById('player');
+
+    // Map track identifiers to your hosted audio files
+    const trackMap = {
+      '1': 'audio/track1.mp3',
+      '2': 'audio/track2.mp3',
+      // …
+    };
+
+    if (track && trackMap[track]) {
+      audio.src = trackMap[track];
+    } else {
+      document.body.insertAdjacentHTML('beforeend', '<p>Track not found.</p>');
+    }
+  </script>
+</body>
+</html>
