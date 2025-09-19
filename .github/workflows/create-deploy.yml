@@ -1,0 +1,76 @@
+name: Create Deploy
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  deployments: write
+  id-token: write
+
+jobs:
+  create-deployment:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create GitHub deployment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          REF="${GITHUB_REF#refs/heads/}"
+          echo "Creating deployment for ref: $REF"
+          RESPONSE=$(curl -s -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            https://api.github.com/repos/${{ github.repository }}/deployments \
+            -d '{"ref":"'"$REF"'", "environment":"production", "required_contexts": [], "transient_environment": false }')
+          echo "$RESPONSE" > deployment_response.json
+          DEPLOYMENT_ID=$(python - <<'PY'
+import json,sys
+try:
+  j=json.load(open('deployment_response.json'))
+  print(j.get('id') or '')
+except Exception:
+  print('')
+PY
+)
+          if [ -z "$DEPLOYMENT_ID" ]; then
+            echo "Failed to create deployment:"
+            cat deployment_response.json
+            exit 1
+          fi
+          echo "Deployment created: $DEPLOYMENT_ID"
+          echo "DEPLOYMENT_ID=$DEPLOYMENT_ID" >> $GITHUB_ENV
+
+      - name: Set deployment status: in_progress
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEPLOYMENT_ID: ${{ env.DEPLOYMENT_ID }}
+        run: |
+          curl -s -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            https://api.github.com/repos/${{ github.repository }}/deployments/$DEPLOYMENT_ID/statuses \
+            -d '{"state":"in_progress"}' > /dev/null
+
+      - name: (Optional) Perform deployment steps
+        run: |
+          echo "Insert real deployment commands here (scp, kubectl, s3 sync, etc.)."
+          # If deployment fails, set status to failure and exit non-zero to mark job failed.
+
+      - name: Set deployment status: success
+        if: ${{ success() }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEPLOYMENT_ID: ${{ env.DEPLOYMENT_ID }}
+        run: |
+          curl -s -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            https://api.github.com/repos/${{ github.repository }}/deployments/$DEPLOYMENT_ID/statuses \
+            -d '{"state":"success"}' > /dev/null
